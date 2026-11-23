@@ -4,6 +4,7 @@ go 1.27.2
 
 require (
 	github.com/ethereum/go-ethereum v1.17.10
+	github.com/joho/godotenv v1.5.1
 	google.golang.org/genai v1.79.1
 )
 
@@ -23,7 +24,6 @@ require (
 	github.com/googleapis/gax-go/v2 v2.17.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
-	github.com/joho/godotenv v1.5.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect
 	go.opentelemetry.io/otel v1.46.0 // indirect

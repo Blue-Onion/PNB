@@ -96,29 +96,32 @@ func geminiCall(
 }
 
 // Check analyzes the transaction and returns AI findings.
-func Check(res *models.Result) (AiReport, error) {
+func Check(res *models.Result, apiKey string) (AiReport, error) {
 	var report AiReport
 
 	if res == nil {
 		return report, fmt.Errorf("transaction result is nil")
 	}
 
-	// Step 1: Convert Go struct to JSON.
+	if strings.TrimSpace(apiKey) == "" {
+		return report, fmt.Errorf("GEMINI_API_KEY is required for AI analysis")
+	}
+
 	data, err := json.Marshal(res)
 	if err != nil {
 		return report, fmt.Errorf("JSON marshal failed: %w", err)
 	}
 
-	// Step 2: Set request timeout.
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
 		30*time.Second,
 	)
 	defer cancel()
 
-	// Step 3: Create Gemini client.
-	// Requires GEMINI_API_KEY environment variable.
-	client, err := genai.NewClient(ctx, nil)
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:  apiKey,
+		Backend: genai.BackendGeminiAPI,
+	})
 	if err != nil {
 		return report, fmt.Errorf("Gemini client failed: %w", err)
 	}
@@ -133,7 +136,6 @@ func Check(res *models.Result) (AiReport, error) {
 		return report, err
 	}
 
-	// Step 5: Convert Gemini JSON into AiReport.
 	if err := json.Unmarshal(
 		[]byte(response),
 		&report,
@@ -144,7 +146,6 @@ func Check(res *models.Result) (AiReport, error) {
 		)
 	}
 
-	// Step 6: Validate essential output fields.
 	if report.Summary == "" {
 		return report, fmt.Errorf(
 			"AI response missing summary",
