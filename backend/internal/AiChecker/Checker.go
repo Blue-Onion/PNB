@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Blue-Onion/PNB/internal/models"
+	"github.com/Blue-Onion/txShield/internal/models"
 	"google.golang.org/genai"
 )
 

@@ -35,9 +35,12 @@ func serveAPI(addr, cert, key, reportID string, check func(string, string) ([]by
 
 func newAPI(reportID string, check func(string, string) ([]byte, error)) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/check-code", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "no-store")
+	mux.HandleFunc("/api/check-code", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			writeAPIError(w, http.StatusMethodNotAllowed, "Use POST to check calldata.")
+			return
+		}
 
 		contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if err != nil || contentType != "application/json" {
@@ -77,17 +80,29 @@ func newAPI(reportID string, check func(string, string) ([]byte, error)) http.Ha
 			log.Printf("build report: %v", err)
 			writeAPIError(w, http.StatusInternalServerError, "Could not generate the report.")
 		default:
-			if _, err := w.Write(data); err != nil {
-				log.Printf("write report: %v", err)
-			}
+			writeAPIResponse(w, http.StatusOK, apiResponse{Result: data})
 		}
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		writeAPIError(w, http.StatusNotFound, "API route not found.")
 	})
 	return mux
 }
 
+type apiResponse struct {
+	Result json.RawMessage `json:"result"`
+	Error  string          `json:"error"`
+}
+
 func writeAPIError(w http.ResponseWriter, status int, message string) {
+	writeAPIResponse(w, status, apiResponse{Error: message})
+}
+
+func writeAPIResponse(w http.ResponseWriter, status int, response apiResponse) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(map[string]string{"error": message}); err != nil {
-		log.Printf("write API error: %v", err)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("write API response: %v", err)
 	}
 }

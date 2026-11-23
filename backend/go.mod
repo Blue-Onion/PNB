@@ -1,4 +1,4 @@
-module github.com/Blue-Onion/PNB
+module github.com/Blue-Onion/txShield
 
 go 1.27.2
 
