@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/Blue-Onion/PNB/internal/models"
+	"github.com/Blue-Onion/txShield/internal/models"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 )

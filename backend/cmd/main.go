@@ -8,17 +8,17 @@ import (
 	"log"
 	"net"
 
-	aichecker "github.com/Blue-Onion/PNB/internal/AiChecker"
-	decoder "github.com/Blue-Onion/PNB/internal/Decoder"
-	permissionchecker "github.com/Blue-Onion/PNB/internal/PermissionChecker"
-	report "github.com/Blue-Onion/PNB/internal/Report"
-	scamchecker "github.com/Blue-Onion/PNB/internal/ScamChecker"
-	"github.com/Blue-Onion/PNB/internal/config"
+	aichecker "github.com/Blue-Onion/txShield/internal/AiChecker"
+	decoder "github.com/Blue-Onion/txShield/internal/Decoder"
+	permissionchecker "github.com/Blue-Onion/txShield/internal/PermissionChecker"
+	report "github.com/Blue-Onion/txShield/internal/Report"
+	scamchecker "github.com/Blue-Onion/txShield/internal/ScamChecker"
+	"github.com/Blue-Onion/txShield/internal/config"
 )
 
 func main() {
 	hexPtr := flag.String("hexcode", "", "Hex code")
-	reportID := flag.String("report-id", "PNB-001", "Report identifier")
+	reportID := flag.String("report-id", "txShield-001", "Report identifier")
 	serve := flag.Bool("serve", false, "Start the local API server")
 	addr := flag.String("addr", "", "Override the API listen address (default localhost:PORT)")
 	cert := flag.String("tls-cert", "", "TLS certificate file")

@@ -1,8 +1,8 @@
 package report
 
 import (
-	aichecker "github.com/Blue-Onion/PNB/internal/AiChecker"
-	"github.com/Blue-Onion/PNB/internal/models"
+	aichecker "github.com/Blue-Onion/txShield/internal/AiChecker"
+	"github.com/Blue-Onion/txShield/internal/models"
 )
 
 type Transaction struct {

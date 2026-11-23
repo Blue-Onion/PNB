@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	aichecker "github.com/Blue-Onion/PNB/internal/AiChecker"
-	decoder "github.com/Blue-Onion/PNB/internal/Decoder"
-	permissionchecker "github.com/Blue-Onion/PNB/internal/PermissionChecker"
-	scamchecker "github.com/Blue-Onion/PNB/internal/ScamChecker"
-	"github.com/Blue-Onion/PNB/internal/models"
+	aichecker "github.com/Blue-Onion/txShield/internal/AiChecker"
+	decoder "github.com/Blue-Onion/txShield/internal/Decoder"
+	permissionchecker "github.com/Blue-Onion/txShield/internal/PermissionChecker"
+	scamchecker "github.com/Blue-Onion/txShield/internal/ScamChecker"
+	"github.com/Blue-Onion/txShield/internal/models"
 )
 
 func TestBuildReportForFlaggedApproval(t *testing.T) {
@@ -24,7 +24,7 @@ func TestBuildReportForFlaggedApproval(t *testing.T) {
 	}
 
 	ai := aichecker.AiReport{Summary: "Review the requested allowance.", Confidence: "MEDIUM"}
-	report := Build("PNB-001", res, ai)
+	report := Build("txShield-001", res, ai)
 	if report.FinalRisk != models.RiskHigh || report.Transaction.Amount != "50001" {
 		t.Fatalf("unexpected risk or transaction: %+v", report)
 	}

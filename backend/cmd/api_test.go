@@ -8,14 +8,14 @@ import (
 )
 
 func TestCheckCodeAPI(t *testing.T) {
-	handler := newAPI("PNB-001", func(hexCode, reportID string) ([]byte, error) {
+	handler := newAPI("txShield-001", func(hexCode, reportID string) ([]byte, error) {
 		if hexCode == "0x00" {
 			return checkCode(hexCode, reportID, "")
 		}
-		if hexCode != "0xdeadbeef" || reportID != "PNB-001" {
+		if hexCode != "0xdeadbeef" || reportID != "txShield-001" {
 			t.Fatalf("unexpected pipeline input %q, %q", hexCode, reportID)
 		}
-		return []byte(`{"report_id":"PNB-001"}`), nil
+		return []byte(`{"report_id":"txShield-001"}`), nil
 	})
 
 	for _, tc := range []struct {
@@ -38,7 +38,7 @@ func TestCheckCodeAPI(t *testing.T) {
 			if res.Code != tc.status {
 				t.Fatalf("got HTTP %d, want %d: %s", res.Code, tc.status, res.Body.String())
 			}
-			if tc.status == http.StatusOK && res.Body.String() != `{"report_id":"PNB-001"}` {
+			if tc.status == http.StatusOK && res.Body.String() != `{"report_id":"txShield-001"}` {
 				t.Fatalf("unexpected report: %s", res.Body.String())
 			}
 		})
