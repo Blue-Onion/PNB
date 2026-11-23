@@ -1,0 +1,12 @@
+**
+!backend/
+!backend/**
+!frontend/
+!frontend/**
+!docker-entrypoint.sh
+**/.git
+**/.env*
+**/node_modules
+**/.next
+**/*.pem
+**/*.key
