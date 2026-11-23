@@ -10,7 +10,7 @@ import (
 
 const (
 	EngineName    = "SCAM_ADDRESS_CHECKER"
-	WarnKnownScam = "Address found in local scam database"
+	WarnKnownScam = "Address found in local test database"
 )
 
 func ScamAddressChecker(

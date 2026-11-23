@@ -26,7 +26,10 @@ const (
 	WarnUnknownFunction    = "Unrecognized function selector"
 )
 
-const tokenApprovalThreshold = 50_000
+const (
+	tokenApprovalThreshold = 50_000
+	engineName             = "PERMISSION_CHECKER"
+)
 
 var maxUint256 = new(big.Int).Sub(
 	new(big.Int).Lsh(big.NewInt(1), 256),
@@ -35,6 +38,8 @@ var maxUint256 = new(big.Int).Sub(
 
 // PermissionChecker adds the permission assessment to res.
 func PermissionChecker(res *models.Result) {
+	var severity models.RiskLevel
+	var message string
 	switch res.Function {
 	case "transfer":
 		res.Risk = string(RiskReview)
@@ -43,14 +48,13 @@ func PermissionChecker(res *models.Result) {
 		res.Risk = string(RiskReview)
 		res.Warning = WarnTokenApproval
 		amount, ok := new(big.Int).SetString(res.Amount, 10)
-		if !ok {
-			return
-		}
-		if amount.Cmp(maxUint256) == 0 {
+		if ok && amount.Cmp(maxUint256) == 0 {
 			res.Risk = string(RiskHigh)
 			res.Warning = WarnUnlimitedApproval
-		} else if amount.Cmp(big.NewInt(tokenApprovalThreshold)) > 0 {
+		} else if ok && amount.Cmp(big.NewInt(tokenApprovalThreshold)) > 0 {
 			res.Warning = WarnLargeTokenApproval
+			severity = models.RiskMedium
+			message = "Approval exceeds 50000 raw token units"
 		}
 	case "setApprovalForAll":
 		res.Risk = string(RiskReview)
@@ -63,4 +67,11 @@ func PermissionChecker(res *models.Result) {
 		res.Risk = string(RiskUnknown)
 		res.Warning = WarnUnknownFunction
 	}
+	if severity == "" {
+		severity = models.RiskLevel(res.Risk)
+		message = res.Warning
+	}
+	res.Findings = append(res.Findings, models.Finding{
+		Engine: engineName, Severity: severity, Message: message,
+	})
 }
