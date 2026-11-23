@@ -64,100 +64,41 @@ func decodeArgs(
 	return args.Unpack(params)
 }
 
-// decodeTransfer handles transfer(address,uint256).
-func decodeTransfer(params []byte) (*models.Result, error) {
-	values, err := decodeArgs(params, "address", "uint256")
-	if err != nil {
-		return nil, err
-	}
-
-	recipient := values[0].(common.Address)
-	amount := values[1].(*big.Int)
-
-	return &models.Result{
-		Function: "transfer",
-		Address:  recipient.Hex(),
-		Amount:   amount.String(),
-		Risk:     string(RiskReview),
-		Warning:  WarnVerifyTransfer,
-	}, nil
-}
-
-// decodeApprove handles approve(address,uint256).
-func decodeApprove(params []byte) (*models.Result, error) {
-	values, err := decodeArgs(params, "address", "uint256")
-	if err != nil {
-		return nil, err
-	}
-
-	spender := values[0].(common.Address)
-	amount := values[1].(*big.Int)
-
-	res := &models.Result{
-		Function: "approve",
-		Address:  spender.Hex(),
-		Amount:   amount.String(),
-		Risk:     string(RiskReview),
-		Warning:  WarnTokenApproval,
-	}
-
-	if amount.Cmp(MaxUint256) == 0 {
-		res.Risk = string(RiskHigh)
-		res.Warning = WarnUnlimitedApproval
-	} else if amount.Cmp(big.NewInt(maxToken)) > 0 {
-		res.Risk = string(RiskReview)
-		res.Warning = WarnTokenApproval
-	}
-	return res, nil
-}
-
-// decodeNFTApproval handles setApprovalForAll(address,bool).
-func decodeNFTApproval(params []byte) (*models.Result, error) {
-	values, err := decodeArgs(params, "address", "bool")
-	if err != nil {
-		return nil, err
-	}
-
-	operator := values[0].(common.Address)
-	approved := values[1].(bool)
-
-	res := &models.Result{
-		Function: "setApprovalForAll",
-		Address:  operator.Hex(),
-		Risk:     string(RiskReview),
-		Warning:  WarnNFTApprovalRemove,
-	}
-
-	if approved {
-		res.Risk = string(RiskHigh)
-		res.Warning = WarnNFTApproval
-	}
-
-	return res, nil
-}
-
-// Decoder is the main entry point.
+// Decoder validates calldata and extracts the arguments for recognized functions.
 func Decoder(input string) (*models.Result, error) {
 	selector, params, err := selectCall(input)
 	if err != nil {
 		return nil, err
 	}
 
+	res := &models.Result{Findings: []models.Finding{}}
 	switch selector {
-	case SelectorTransfer:
-		return decodeTransfer(params)
+	case SelectorTransfer, SelectorApprove:
+		values, err := decodeArgs(params, "address", "uint256")
+		if err != nil {
+			return nil, err
+		}
 
-	case SelectorApprove:
-		return decodeApprove(params)
+		res.Function = "transfer"
+		if selector == SelectorApprove {
+			res.Function = "approve"
+		}
+		res.Address = values[0].(common.Address).Hex()
+		res.Amount = values[1].(*big.Int).String()
 
 	case SelectorSetApprovalForAll:
-		return decodeNFTApproval(params)
+		values, err := decodeArgs(params, "address", "bool")
+		if err != nil {
+			return nil, err
+		}
+
+		approved := values[1].(bool)
+		res.Function = "setApprovalForAll"
+		res.Address = values[0].(common.Address).Hex()
+		res.Approved = &approved
 
 	default:
-		return &models.Result{
-			Function: "unknown",
-			Risk:     string(RiskUnknown),
-			Warning:  WarnUnknownFunction,
-		}, nil
+		res.Function = "unknown"
 	}
+	return res, nil
 }
