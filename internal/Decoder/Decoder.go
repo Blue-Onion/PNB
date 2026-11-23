@@ -11,104 +11,153 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-const (
-	SelectorTransfer          = "a9059cbb"
-	SelectorApprove           = "095ea7b3"
-	SelectorSetApprovalForAll = "a22cb465"
-)
-
-func selectCall(input string) (selector string, params []byte, err error) {
+// selectCall validates calldata and extracts the selector.
+func selectCall(input string) (string, []byte, error) {
 	if !strings.HasPrefix(input, "0x") {
-		return "", nil, fmt.Errorf("Malformed Hexcode")
+		return "", nil, fmt.Errorf("missing 0x prefix")
 	}
 
 	data, err := hex.DecodeString(input[2:])
 	if err != nil {
-		return "", nil, err
+		return "", nil, fmt.Errorf("invalid hex: %w", err)
 	}
+
 	if len(data) < 4 {
-		return "", nil, fmt.Errorf("Call Data too Short")
+		return "", nil, fmt.Errorf("calldata too short")
 	}
-	return hex.EncodeToString(data[:4]), data[4:], nil
+
+	selector := hex.EncodeToString(data[:4])
+	params := data[4:]
+
+	return selector, params, nil
 }
 
+// decodeArgs decodes two static ABI parameters.
+func decodeArgs(
+	params []byte,
+	firstType string,
+	secondType string,
+) ([]interface{}, error) {
+
+	if len(params) != 64 {
+		return nil, fmt.Errorf(
+			"expected 64 parameter bytes, got %d",
+			len(params),
+		)
+	}
+
+	t1, err := abi.NewType(firstType, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	t2, err := abi.NewType(secondType, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	args := abi.Arguments{
+		{Type: t1},
+		{Type: t2},
+	}
+
+	return args.Unpack(params)
+}
+
+// decodeTransfer handles transfer(address,uint256).
+func decodeTransfer(params []byte) (*models.Result, error) {
+	values, err := decodeArgs(params, "address", "uint256")
+	if err != nil {
+		return nil, err
+	}
+
+	recipient := values[0].(common.Address)
+	amount := values[1].(*big.Int)
+
+	return &models.Result{
+		Function: "transfer",
+		Address:  recipient.Hex(),
+		Amount:   amount.String(),
+		Risk:     string(RiskReview),
+		Warning:  WarnVerifyTransfer,
+	}, nil
+}
+
+// decodeApprove handles approve(address,uint256).
+func decodeApprove(params []byte) (*models.Result, error) {
+	values, err := decodeArgs(params, "address", "uint256")
+	if err != nil {
+		return nil, err
+	}
+
+	spender := values[0].(common.Address)
+	amount := values[1].(*big.Int)
+
+	res := &models.Result{
+		Function: "approve",
+		Address:  spender.Hex(),
+		Amount:   amount.String(),
+		Risk:     string(RiskReview),
+		Warning:  WarnTokenApproval,
+	}
+
+	if amount.Cmp(MaxUint256) == 0 {
+		res.Risk = string(RiskHigh)
+		res.Warning = WarnUnlimitedApproval
+	} else if amount.Cmp(big.NewInt(maxToken)) > 0 {
+		res.Risk = string(RiskReview)
+		res.Warning = WarnTokenApproval
+	}
+	return res, nil
+}
+
+// decodeNFTApproval handles setApprovalForAll(address,bool).
+func decodeNFTApproval(params []byte) (*models.Result, error) {
+	values, err := decodeArgs(params, "address", "bool")
+	if err != nil {
+		return nil, err
+	}
+
+	operator := values[0].(common.Address)
+	approved := values[1].(bool)
+
+	res := &models.Result{
+		Function: "setApprovalForAll",
+		Address:  operator.Hex(),
+		Risk:     string(RiskReview),
+		Warning:  WarnNFTApprovalRemove,
+	}
+
+	if approved {
+		res.Risk = string(RiskHigh)
+		res.Warning = WarnNFTApproval
+	}
+
+	return res, nil
+}
+
+// Decoder is the main entry point.
 func Decoder(input string) (*models.Result, error) {
 	selector, params, err := selectCall(input)
 	if err != nil {
 		return nil, err
 	}
-	res := models.Result{}
-	addressType, _ := abi.NewType("address", "", nil)
-	uintType, _ := abi.NewType("uint256", "", nil)
-	boolType, _ := abi.NewType("bool", "", nil)
+
 	switch selector {
-	case SelectorApprove:
-		args := abi.Arguments{
-			{Type: addressType},
-			{Type: uintType},
-		}
-		values, err := args.Unpack(params)
-		if err != nil {
-			return &res, err
-		}
-		spendor := values[0].(common.Address)
-		amount := values[1].(*big.Int)
-		maxUnit := new(big.Int).Sub(
-			new(big.Int).Lsh(big.NewInt(1), 256),
-			big.NewInt(1),
-		)
-		res.Function = "approve"
-		res.Address = spendor.Hex()
-		res.Amount = amount.String()
-		if amount.Cmp(maxUnit) == 0 {
-			res.Risk = "HIGH"
-			res.Warning = "Unlimited Token Spending approval"
-		} else {
-			res.Risk = "REVIEW"
-			res.Warning = "Token spending permission requested"
-		}
 	case SelectorTransfer:
-		args := abi.Arguments{
-			{Type: addressType},
-			{Type: uintType},
-		}
-		values, err := args.Unpack(params)
-		if err != nil {
-			return &res, err
-		}
-		recipent := values[0].(common.Address)
-		amount := values[1].(*big.Int)
-		res.Function = "transfer"
-		res.Address = recipent.Hex()
-		res.Amount = amount.String()
-		res.Risk = "REVIEW"
-		res.Warning = "Verify It first"
+		return decodeTransfer(params)
+
+	case SelectorApprove:
+		return decodeApprove(params)
+
 	case SelectorSetApprovalForAll:
+		return decodeNFTApproval(params)
 
-		args := abi.Arguments{
-			{Type: addressType},
-			{Type: boolType},
-		}
-		values, err := args.Unpack(params)
-		if err != nil {
-			return &res, err
-		}
-		opr := values[0].(common.Address)
-		apr := values[1].(bool)
-		res.Function = "setApprovalForAll"
-		res.Address = opr.Hex()
-
-		if apr {
-			res.Risk = "HIGH"
-			res.Warning = "Collection-wide NFT operator approval"
-		} else {
-			res.Risk = "REVIEW"
-			res.Warning = "NFT operator approval removal requested"
-		}
 	default:
-		res.Function = "unknown"
-		res.Risk = "UNKNOWN"
-		res.Warning = "Unrecognized function selector"
+		return &models.Result{
+			Function: "unknown",
+			Risk:     string(RiskUnknown),
+			Warning:  WarnUnknownFunction,
+		}, nil
 	}
-	return &res, nil
 }
