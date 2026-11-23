@@ -1,0 +1,5 @@
+package permissionchecker
+
+func PermissonChecker() {
+
+}
