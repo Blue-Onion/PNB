@@ -1,11 +1,15 @@
 # txShield frontend
 
 From the repository root, run `make run` and open http://localhost:3000.
-Install the frontend dependencies with `bun install` in this directory first if needed.
+Install the frontend dependencies with `bun install` in this directory first.
 
-The browser posts calldata to `/api/check-code`. Next.js forwards the request to
-the Go backend at `http://localhost:8080`. Set `BACKEND_URL` in the frontend
-process environment if the Go service uses a different origin.
+Copy `.env.example` to `.env` and set `NEXT_PUBLIC_API_BASE_URL` to the
+browser-accessible Go backend URL. The example uses http://localhost:8080.
+Restart the development server or rebuild the production bundle after changing it.
 
-The API returns both `result` and `error`. Successful checks return a report
-and an empty error string. Failed checks return a null result and an error message.
+When the public URL is unset, the frontend uses the same-origin Next.js rewrite.
+Its destination is configured by `BACKEND_URL` at build time, as used by Docker.
+
+The service sends `GET /api/check/{hexcode}`. A successful response has
+`Success: true` and a report in `Data`. Validation failures return HTTP 400
+with `Success: false` and an error string in `Data`.

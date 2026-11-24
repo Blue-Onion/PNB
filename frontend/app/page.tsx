@@ -3,11 +3,12 @@
 import { useState, type FormEvent } from "react";
 import { useFetch } from "@/hooks/use-fetch";
 import { checkCode } from "@/services/check-code";
+import { demoPresets } from "@/services/demo-presets";
 import { SecurityReport } from "./components/security-report";
 
 export default function Home() {
   const [hexcode, setHexcode] = useState("");
-  const { run, result, error, pending, dismissError } = useFetch(checkCode);
+  const { run, result, error, pending, reset, dismissError } = useFetch(checkCode);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -17,11 +18,12 @@ export default function Home() {
   return (
     <main className="workspace">
       <header className="site-header">
-        <span className="wordmark">txShield</span>
+        <span className="wordmark"><span aria-hidden="true" className="brand-mark">◇</span>txShield</span>
         <span className="header-label">Ethereum transaction analyzer</span>
       </header>
 
       <section className="panel input-panel" aria-labelledby="page-title">
+        <div aria-hidden="true" className="input-icon">&gt;_</div>
         <h1 id="page-title">Review a transaction</h1>
         <p className="muted">Paste Ethereum calldata to inspect permissions and security findings before signing.</p>
         <form onSubmit={submit}>
@@ -30,15 +32,38 @@ export default function Home() {
             id="hexcode"
             placeholder="0x…"
             value={hexcode}
-            onChange={(event) => setHexcode(event.target.value)}
+            onChange={(event) => {
+              setHexcode(event.target.value);
+              reset();
+            }}
+            disabled={pending}
             rows={3}
             autoCapitalize="off"
             autoComplete="off"
             spellCheck={false}
             required
           />
+          <fieldset className="presets" disabled={pending}>
+            <legend>Demo presets</legend>
+            <div className="preset-list">
+              {demoPresets.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  aria-pressed={hexcode === preset.calldata}
+                  onClick={() => {
+                    setHexcode(preset.calldata);
+                    reset();
+                  }}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <button className="submit" type="submit" disabled={pending || !hexcode.trim()}>
             {pending ? "Analyzing…" : "Analyze calldata"}
+            <span aria-hidden="true">{pending ? "…" : "→"}</span>
           </button>
         </form>
         <div className="sr-only" role="status">
@@ -46,7 +71,7 @@ export default function Home() {
         </div>
       </section>
 
-      {result && <SecurityReport report={result} />}
+      {result && <SecurityReport key={result.report.report_id} {...result} />}
       {error && (
         <div className="toast">
           <div role="alert">

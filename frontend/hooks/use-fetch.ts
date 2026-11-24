@@ -18,5 +18,10 @@ export function useFetch<Input, Result>(request: (input: Input) => Promise<Resul
     }
   }
 
-  return { run, result, error, pending, dismissError: () => setError("") };
+  function reset() {
+    setResult(null);
+    setError("");
+  }
+
+  return { run, result, error, pending, reset, dismissError: () => setError("") };
 }
