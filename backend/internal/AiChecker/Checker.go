@@ -3,7 +3,9 @@ package aichecker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -64,12 +66,14 @@ func geminiCall(
 	ctx context.Context,
 	client *genai.Client,
 	transactionJSON string,
+	logger *slog.Logger,
 ) (string, error) {
 
 	prompt := sysPrompt +
 		"\n\nTransaction JSON:\n" +
 		transactionJSON
 
+	start := time.Now()
 	resp, err := client.Models.GenerateContent(
 		ctx,
 		"gemini-3.5-flash",
@@ -79,36 +83,51 @@ func geminiCall(
 			Temperature:      genai.Ptr(float32(0.1)),
 		},
 	)
+	callLogger := logger.With("service", "gemini", "operation", "GenerateContent", "duration", time.Since(start))
 	if err != nil {
+		var apiErr genai.APIError
+		if errors.As(err, &apiErr) {
+			callLogger = callLogger.With("status", apiErr.Code)
+		}
+		callLogger.Error("Outbound API call failed", "error_type", fmt.Sprintf("%T", err))
 		return "", fmt.Errorf("Gemini request failed: %w", err)
 	}
+	callLogger.Info("Outbound API call completed")
 
 	if resp == nil {
-		return "", fmt.Errorf("Gemini returned nil response")
+		err := errors.New("Gemini returned nil response")
+		logger.Error("Validate Gemini response", "error", err)
+		return "", err
 	}
 
 	output := strings.TrimSpace(resp.Text())
 	if output == "" {
-		return "", fmt.Errorf("Gemini returned empty response")
+		err := errors.New("Gemini returned empty response")
+		logger.Error("Validate Gemini response", "error", err)
+		return "", err
 	}
 
 	return output, nil
 }
 
 // Check analyzes the transaction and returns AI findings.
-func Check(res *models.Result, apiKey string) (AiReport, error) {
+func Check(res *models.Result, apiKey string, logger *slog.Logger) (AiReport, error) {
 	var report AiReport
-
 	if res == nil {
-		return report, fmt.Errorf("transaction result is nil")
+		err := errors.New("transaction result is nil")
+		logger.Error("Prepare AI analysis", "error", err)
+		return report, err
 	}
 
 	if strings.TrimSpace(apiKey) == "" {
-		return report, fmt.Errorf("GEMINI_API_KEY is required for AI analysis")
+		err := errors.New("GEMINI_API_KEY is required for AI analysis")
+		logger.Error("Prepare AI analysis", "error", err)
+		return report, err
 	}
 
 	data, err := json.Marshal(res)
 	if err != nil {
+		logger.Error("Encode transaction for AI analysis", "error", err)
 		return report, fmt.Errorf("JSON marshal failed: %w", err)
 	}
 
@@ -123,6 +142,7 @@ func Check(res *models.Result, apiKey string) (AiReport, error) {
 		Backend: genai.BackendGeminiAPI,
 	})
 	if err != nil {
+		logger.Error("Initialize Gemini client", "error_type", fmt.Sprintf("%T", err))
 		return report, fmt.Errorf("Gemini client failed: %w", err)
 	}
 
@@ -131,6 +151,7 @@ func Check(res *models.Result, apiKey string) (AiReport, error) {
 		ctx,
 		client,
 		string(data),
+		logger,
 	)
 	if err != nil {
 		return report, err
@@ -140,6 +161,7 @@ func Check(res *models.Result, apiKey string) (AiReport, error) {
 		[]byte(response),
 		&report,
 	); err != nil {
+		logger.Error("Decode AI response", "error_type", fmt.Sprintf("%T", err))
 		return report, fmt.Errorf(
 			"invalid AI JSON response: %w",
 			err,
@@ -147,9 +169,9 @@ func Check(res *models.Result, apiKey string) (AiReport, error) {
 	}
 
 	if report.Summary == "" {
-		return report, fmt.Errorf(
-			"AI response missing summary",
-		)
+		err := errors.New("AI response missing summary")
+		logger.Error("Validate AI response", "error", err)
+		return report, err
 	}
 
 	return report, nil
