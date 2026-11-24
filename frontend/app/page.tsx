@@ -6,6 +6,29 @@ import { checkCode } from "@/services/check-code";
 import { demoPresets } from "@/services/demo-presets";
 import { SecurityReport } from "./components/security-report";
 
+function ReportSkeleton() {
+  return (
+    <div className="report report-skeleton" aria-hidden="true">
+      <div className="panel">
+        <div className="skeleton-bar skeleton-badge" />
+        <div className="skeleton-bar skeleton-title" />
+        <div className="skeleton-bar skeleton-summary" />
+      </div>
+      <div className="panel">
+        <div className="skeleton-bar skeleton-heading" />
+        <div className="metrics">
+          {["function", "address", "permission"].map((field) => (
+            <div className="metric" key={field}>
+              <div className="skeleton-bar skeleton-label" />
+              <div className="skeleton-bar skeleton-value" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [hexcode, setHexcode] = useState("");
   const { run, result, error, pending, reset, dismissError } = useFetch(checkCode);
@@ -61,7 +84,7 @@ export default function Home() {
               ))}
             </div>
           </fieldset>
-          <button className="submit" type="submit" disabled={pending || !hexcode.trim()}>
+          <button className="submit" type="submit" disabled={pending}>
             {pending ? "Analyzing…" : "Analyze calldata"}
             <span aria-hidden="true">{pending ? "…" : "→"}</span>
           </button>
@@ -71,7 +94,7 @@ export default function Home() {
         </div>
       </section>
 
-      {result && <SecurityReport key={result.report.report_id} {...result} />}
+      {pending ? <ReportSkeleton /> : result && <SecurityReport key={result.report.report_id} {...result} />}
       {error && (
         <div className="toast">
           <div role="alert">

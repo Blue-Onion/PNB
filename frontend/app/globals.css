@@ -128,6 +128,33 @@ textarea::placeholder { color: var(--muted); }
 .submit:disabled { background: #a1a1aa; color: #18181b; }
 
 .report { display: grid; gap: 16px; margin-top: 22px; }
+.report-skeleton .skeleton-bar {
+  height: 1rem;
+  border-radius: 5px;
+  background: #3f3f46;
+}
+.report-skeleton .skeleton-badge { width: 4rem; height: 1.35rem; }
+.report-skeleton .skeleton-title {
+  width: min(70%, 23rem);
+  height: clamp(1.85rem, 5vw, 3rem);
+  margin-top: 12px;
+}
+.report-skeleton .skeleton-summary { width: min(90%, 36rem); margin-top: 9px; }
+.report-skeleton .skeleton-heading { width: 10rem; max-width: 75%; margin-bottom: 14px; }
+.report-skeleton .skeleton-label { width: 50%; height: .8rem; }
+.report-skeleton .skeleton-value { width: 78%; margin-top: 6px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .report-skeleton .skeleton-bar {
+    animation: report-skeleton-pulse 1.6s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes report-skeleton-pulse {
+  from { opacity: .45; }
+  to { opacity: 1; }
+}
+
 .verdict p { margin-top: 9px; max-width: 66ch; }
 .verdict h2 { margin-top: 12px; }
 .verdict[data-risk="HIGH"] {
