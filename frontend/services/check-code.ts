@@ -61,7 +61,7 @@ export async function checkCode(
 
   try {
     response = await fetch(
-      `${baseUrl}/api/check/${encodeURIComponent(calldata)}`,
+      `https://pnb-4.onrender.com/api/check/${encodeURIComponent(calldata)}`,
       {
         headers: { Accept: "application/json" },
         cache: "no-store",
