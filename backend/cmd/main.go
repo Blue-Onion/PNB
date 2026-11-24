@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"log"
-	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	aichecker "github.com/Blue-Onion/txShield/internal/AiChecker"
 	decoder "github.com/Blue-Onion/txShield/internal/Decoder"
@@ -14,44 +18,61 @@ import (
 	report "github.com/Blue-Onion/txShield/internal/Report"
 	scamchecker "github.com/Blue-Onion/txShield/internal/ScamChecker"
 	"github.com/Blue-Onion/txShield/internal/config"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
+	"github.com/google/uuid"
 )
 
 func main() {
-	hexPtr := flag.String("hexcode", "", "Hex code")
-	reportID := flag.String("report-id", "txShield-001", "Report identifier")
-	serve := flag.Bool("serve", false, "Start the local API server")
-	addr := flag.String("addr", "", "Override the API listen address (default localhost:PORT)")
-	cert := flag.String("tls-cert", "", "TLS certificate file")
-	key := flag.String("tls-key", "", "TLS private key file")
-	flag.Parse()
-
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatal(err)
+		panic("Config Not loaded")
 	}
-	check := func(hexCode, reportID string) ([]byte, error) {
-		return checkCode(hexCode, reportID, cfg.GeminiAPIKey)
+	port := cfg.Port
+	server := http.Server{
+		Handler: newServerRouter(),
+		Addr:    ":" + port,
 	}
-
-	if *serve {
-		listenAddr := *addr
-		if listenAddr == "" {
-			listenAddr = net.JoinHostPort("localhost", cfg.Port)
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
+	go func() {
+		log.Printf("Listening on http://localhost:%s", port)
+		err := server.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Error occurred: %v", err)
 		}
-		log.Fatal(serveAPI(listenAddr, *cert, *key, *reportID, check))
+	}()
+	<-stop
+	log.Println("Shutting down server...")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*6)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Error occurred in Shutdown: %v", err)
 	}
+}
 
-	data, err := check(*hexPtr, *reportID)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(string(data))
+func newServerRouter() http.Handler {
+	router := chi.NewRouter()
+	router.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"https://*", "http://*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
+	router.Mount("/api", Router())
+	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("hello"))
+	})
+	return router
 }
 
 var errInvalidCalldata = errors.New("invalid calldata")
 
 // checkCode runs the transaction checks and returns the JSON report.
-func checkCode(hexCode, reportID, geminiAPIKey string) ([]byte, error) {
+func checkCode(hexCode string) ([]byte, error) {
 	res, err := decoder.Decoder(hexCode)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errInvalidCalldata, err)
@@ -61,12 +82,16 @@ func checkCode(hexCode, reportID, geminiAPIKey string) ([]byte, error) {
 	if err := scamchecker.ScamAddressChecker(res); err != nil {
 		log.Println(err)
 	}
-
-	ai, err := aichecker.Check(res, geminiAPIKey)
+	cfg, err := config.Load()
+	if err != nil {
+		return []byte(""), err
+	}
+	ai, err := aichecker.Check(res, cfg.GeminiAPIKey)
 	if err != nil {
 		log.Println(err)
 	}
 
+	reportID := uuid.New().String()
 	result := report.Build(reportID, res, ai)
 	if err != nil {
 		result.Analysis.Status = "AI_UNAVAILABLE"
